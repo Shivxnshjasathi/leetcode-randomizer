@@ -4,93 +4,77 @@
   --background: #ffffff;
   --foreground: #111111;
   --accent: #000000;
-  --card: #ffffff;
-  --border: #e2e8f0;
-  --secondary: #64748b;
+  --card: #f9f9f9;
+  --panel: #ffffff;
+  --border: #eeeeee;
+  --secondary: #666666;
+  --highlight: #000000;
 }
 
 .dark {
   --background: #0a0a0a;
-  --foreground: #f8fafc;
-  --card: #111111;
-  --border: #1e293b;
-  --secondary: #94a3b8;
+  --foreground: #ffffff;
+  --card: #141414;
+  --panel: #111111;
+  --border: #1f1f1f;
+  --secondary: #a1a1a1;
+  --accent: #ffffff;
+  --highlight: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
   --color-card: var(--card);
+  --color-panel: var(--panel);
   --color-border: var(--border);
   --color-secondary: var(--secondary);
-  --font-poppins: var(--font-poppins);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-poppins), sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-poppins), -apple-system, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
   -webkit-font-smoothing: antialiased;
 }
 
-.transition-soft {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
 }
 
 .tag-id {
-  background: rgba(15, 23, 42, 0.9);
-  color: #94a3b8;
-  padding: 4px 12px;
-  border-radius: 9999px;
+  background: var(--border);
+  color: var(--secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 10px;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 800;
 }
 
-.tag-easy {
-  background: #dcfce7;
-  color: #15803d;
-  padding: 4px 14px;
-  border-radius: 9999px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
-
-.tag-medium {
-  background: #fef3c7;
-  color: #b45309;
-  padding: 4px 14px;
-  border-radius: 9999px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
-
-.tag-hard {
-  background: #fee2e2;
-  color: #b91c1c;
-  padding: 4px 14px;
-  border-radius: 9999px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
+.tag-easy { background: #dcfce720; color: #22c55e; padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 900; }
+.tag-medium { background: #fef3c720; color: #f59e0b; padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 900; }
+.tag-hard { background: #fee2e220; color: #ef4444; padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 900; }
 
 .solve-btn {
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  padding: 8px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 16px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   transition: all 0.2s ease;
 }
 
-.solve-btn:hover {
-  background: var(--foreground);
-  color: var(--background);
-}
+.solve-btn:hover { background: var(--foreground); color: var(--background); }
