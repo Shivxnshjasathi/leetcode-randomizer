@@ -78,7 +78,7 @@ const LANGUAGES = [
 ];
 
 export default function Home() {
-  const [masterList, setMasterList] = useState<LightweightQuestion[]>([]);
+  const [masterList, setMasterList] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Question | null>(null);
   const [layoutMode, setLayoutMode] = useState<'split' | 'editor' | 'desc'>('split');
@@ -117,11 +117,27 @@ export default function Home() {
   const [activeTestCase, setActiveTestCase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
-  const [fetchingMaster, setFetchingMaster] = useState(false);
   const [interviewMode, setInterviewMode] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Load Data Locally ──
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/data/question_v2.json');
+        const data = await res.json();
+        setMasterList(data);
+        // Initial random selection
+        const randomQ = data[Math.floor(Math.random() * data.length)];
+        setSelected(randomQ);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load data", err);
+      }
+    };
+    
+    fetchData();
+
     const s = localStorage.getItem("solved_ids");
     if (s) setSolvedIds(JSON.parse(s));
     const n = localStorage.getItem("problem_notes");
@@ -144,20 +160,7 @@ export default function Home() {
     } else {
       document.documentElement.classList.add("dark");
     }
-    randomize();
   }, []);
-
-  useEffect(() => {
-    if (listOpen && masterList.length === 0 && !fetchingMaster) {
-      setFetchingMaster(true);
-      fetch('/api/questions?search_only=true')
-        .then(res => res.json())
-        .then(data => {
-          setMasterList(data);
-          setFetchingMaster(false);
-        });
-    }
-  }, [listOpen, masterList.length, fetchingMaster]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -165,7 +168,8 @@ export default function Home() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
         async payload => {
           const newQId = payload.new.question_id;
-          fetchQuestionById(newQId);
+          const found = masterList.find(q => q.frontendQuestionId === newQId);
+          if (found) { setSelected(found); setTime(0); }
         }
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_participants', filter: `room_id=eq.${roomId}` },
@@ -176,7 +180,7 @@ export default function Home() {
       )
       .subscribe();
     return () => { supabase.removeChannel(roomChannel); };
-  }, [roomId]);
+  }, [roomId, masterList]);
 
   useEffect(() => {
     if (selected) {
@@ -249,36 +253,40 @@ export default function Home() {
     const { data } = await supabase.from('rooms').select('*').eq('id', joinCode.toUpperCase()).single();
     if (data) {
       setRoomId(joinCode.toUpperCase()); setIsCreator(false);
-      fetchQuestionById(data.question_id);
+      const found = masterList.find(q => q.frontendQuestionId === data.question_id);
+      if (found) setSelected(found);
       await supabase.from('room_participants').insert({ room_id: joinCode.toUpperCase(), user_email: user.email });
       setRoomModal(false);
     }
   };
 
-  const fetchQuestionById = async (id: string) => {
-    setLoading(true);
-    const res = await fetch(`/api/questions?limit=1&id=${id}`);
-    const data = await res.json();
-    if (data.length > 0) {
-      setSelected(data[0]);
-      setTime(0);
-    }
-    setLoading(false);
-  };
-
-  const randomize = async (overrideTag?: string) => {
-    setLoading(true);
+  const randomize = (overrideTag?: string) => {
+    if (masterList.length === 0) return;
+    
     const tagToUse = overrideTag || tagFilter;
-    const qs = new URLSearchParams({ limit: '1', random: 'true', difficulty: diffFilter, tag: tagToUse });
-    const res = await fetch(`/api/questions?${qs}`);
-    const data = await res.json();
-    if (data.length > 0) {
-      setSelected(data[0]);
-      if (roomId && isCreator) {
-        supabase.from('rooms').update({ question_id: data[0].frontendQuestionId }).eq('id', roomId).then();
-      }
+    let filtered = masterList;
+    
+    if (diffFilter !== "All") {
+      filtered = filtered.filter(q => q.difficulty === diffFilter);
     }
-    setLoading(false); setTime(0); setShowHints(false);
+    
+    if (tagToUse !== "All Tags") {
+      filtered = filtered.filter(q => 
+        (q.topics?.includes(tagToUse)) || 
+        (q.category === tagToUse)
+      );
+    }
+    
+    if (filtered.length === 0) return;
+    
+    const randomQ = filtered[Math.floor(Math.random() * filtered.length)];
+    setSelected(randomQ);
+    setTime(0);
+    setShowHints(false);
+    
+    if (roomId && isCreator) {
+      supabase.from('rooms').update({ question_id: randomQ.frontendQuestionId }).eq('id', roomId).then();
+    }
   };
 
   const parseTestCases = (desc: string) => {
@@ -370,17 +378,17 @@ export default function Home() {
               <button onClick={() => { setListOpen(false); setSearchQ(""); }} className="p-2 opacity-40 hover:opacity-100 hover:bg-card rounded-full"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              {fetchingMaster && masterList.length === 0 ? (
+              {loading ? (
                 <div className="flex flex-col items-center justify-center h-full gap-4 opacity-40">
                   <RefreshCcw className="animate-spin" size={32} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Loading Vault Questions...</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Syncing Vault...</span>
                 </div>
               ) : filteredQuestions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full opacity-20 text-[12px] font-black uppercase">No matches found</div>
               ) : (
                 <div className="space-y-1">
                   {filteredQuestions.map(q => (
-                    <div key={q.frontendQuestionId} onClick={() => { fetchQuestionById(q.frontendQuestionId); setListOpen(false); setSearchQ(""); }} className="flex items-center justify-between p-4 hover:bg-cyan-500/10 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-cyan-500/20">
+                    <div key={q.frontendQuestionId} onClick={() => { setSelected(q); setListOpen(false); setSearchQ(""); setTime(0); }} className="flex items-center justify-between p-4 hover:bg-cyan-500/10 rounded-2xl cursor-pointer group transition-all border border-transparent hover:border-cyan-500/20">
                       <div className="flex items-center gap-4 truncate">
                         <span className="text-[12px] opacity-20 w-10 shrink-0 group-hover:opacity-100 group-hover:text-cyan-500 transition-all">{q.frontendQuestionId}</span>
                         <span className="font-bold text-[14px] truncate">{q.title}</span>
@@ -461,14 +469,14 @@ export default function Home() {
             )}
 
             <div className="hidden lg:flex items-center gap-3 bg-card border border-border px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-secondary">
-              <select value={diffFilter} onChange={e => setDiffFilter(e.target.value)} className="bg-transparent outline-none"><option>All</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+              <select value={diffFilter} onChange={e => {setDiffFilter(e.target.value); randomize();}} className="bg-transparent outline-none"><option>All</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
               <button onClick={() => randomize()} className="text-foreground ml-2 hover:rotate-180 transition-transform duration-500"><Shuffle size={14} /></button>
             </div>
           </div>
         </header>
       )}
 
-      {/* ── Mobile Menu Overlay ── */}
+      {/* ── Mobile Menu Overlay (Burger Center) ── */}
       {menuOpen && (
         <div className="absolute top-14 left-0 right-0 bottom-0 bg-background/95 backdrop-blur-xl z-[60] p-6 space-y-8 lg:hidden animate-in slide-in-from-top-4 duration-300 overflow-y-auto no-scrollbar">
           <div className="flex justify-between items-center">
