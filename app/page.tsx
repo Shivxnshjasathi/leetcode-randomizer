@@ -48,55 +48,55 @@ const diffClass = (d: string) => {
 
 // ── Normalize data on import ──────────────────────────────────────────────────
 const ALL_QUESTIONS: Question[] = (rawData as any[]).map(q => ({
-  difficulty:          normDiff(q.difficulty),
-  frontendQuestionId:  q.frontendQuestionId || q.id || "0",
-  paidOnly:            q.paidOnly || q.isPaidOnly || false,
-  title:               q.title || "Untitled",
-  titleSlug:           q.titleSlug || q.slug || "",
-  url:                 q.url || (q.slug ? `https://leetcode.com/problems/${q.slug}/` : ""),
-  description_url:     q.description_url || "",
-  description:         q.description || "<p>Analyze the requirements and implement your solution.</p>",
-  solution_url:        q.solution_url || null,
-  category:            q.category || "Algorithms",
-  acceptance_rate:     q.acceptance_rate || parseFloat(q.acceptance) || 0,
-  topics:              Array.isArray(q.topics) ? q.topics : [],
-  hints:               Array.isArray(q.hints) ? q.hints : [],
-  likes:               q.likes || 0,
-  dislikes:            q.dislikes || 0,
-  similar_questions:   q.similar_questions || "[]",
-  stats:               typeof q.stats === "string" ? q.stats : JSON.stringify(q.stats || {}),
+  difficulty: normDiff(q.difficulty),
+  frontendQuestionId: q.frontendQuestionId || q.id || "0",
+  paidOnly: q.paidOnly || q.isPaidOnly || false,
+  title: q.title || "Untitled",
+  titleSlug: q.titleSlug || q.slug || "",
+  url: q.url || (q.slug ? `https://leetcode.com/problems/${q.slug}/` : ""),
+  description_url: q.description_url || "",
+  description: q.description || "<p>Analyze the requirements and implement your solution.</p>",
+  solution_url: q.solution_url || null,
+  category: q.category || "Algorithms",
+  acceptance_rate: q.acceptance_rate || parseFloat(q.acceptance) || 0,
+  topics: Array.isArray(q.topics) ? q.topics : [],
+  hints: Array.isArray(q.hints) ? q.hints : [],
+  likes: q.likes || 0,
+  dislikes: q.dislikes || 0,
+  similar_questions: q.similar_questions || "[]",
+  stats: typeof q.stats === "string" ? q.stats : JSON.stringify(q.stats || {}),
 }));
 
 const LANGUAGES = [
-  { 
-    id: "cpp", 
-    label: "C++", 
+  {
+    id: "cpp",
+    label: "C++",
     version: "10.2.0",
-    template: "#include <iostream>\n#include <vector>\n#include <string>\n\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        cout << \"Hello from Real C++ Compiler!\" << endl;\n    }\n};\n\nint main() {\n    Solution sol;\n    sol.solve();\n    return 0;\n}" 
+    template: "#include <iostream>\n#include <vector>\n#include <string>\n\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        cout << \"Hello from Real C++ Compiler!\" << endl;\n    }\n};\n\nint main() {\n    Solution sol;\n    sol.solve();\n    return 0;\n}"
   }
 ];
 
 export default function Home() {
   const [randomQuestions, setRandomQuestions] = useState<Question[]>([]);
-  const [selected,        setSelected]        = useState<Question | null>(null);
-  const [diffFilter,      setDiffFilter]      = useState("All");
-  const [tagFilter,       setTagFilter]       = useState("All Tags");
-  const [theme,           setTheme]           = useState<"dark"|"light">("dark");
-  const [leftTab,         setLeftTab]         = useState<"description"|"notes">("description");
-  const [consoleTab,      setConsoleTab]      = useState<"testcase"|"result"|"terminal">("testcase");
-  const [lang,            setLang]            = useState(LANGUAGES[0]);
-  const [code,            setCode]            = useState(LANGUAGES[0].template);
-  const [results,         setResults]         = useState<any[]>([]);
-  const [isRunning,       setIsRunning]       = useState(false);
-  const [consoleOpen,     setConsoleOpen]     = useState(false);
-  const [listOpen,        setListOpen]        = useState(false);
-  const [showHints,       setShowHints]       = useState(false);
-  const [searchQ,         setSearchQ]         = useState("");
-  const [solvedIds,       setSolvedIds]       = useState<string[]>([]);
-  const [notes,           setNotes]           = useState<Record<string, string>>({});
-  const [time,            setTime]            = useState(0);
-  const [timerOn,         setTimerOn]         = useState(true);
-  const [activeTestCase,  setActiveTestCase]  = useState(0);
+  const [selected, setSelected] = useState<Question | null>(null);
+  const [diffFilter, setDiffFilter] = useState("All");
+  const [tagFilter, setTagFilter] = useState("All Tags");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [leftTab, setLeftTab] = useState<"description" | "notes">("description");
+  const [consoleTab, setConsoleTab] = useState<"testcase" | "result" | "terminal">("testcase");
+  const [lang, setLang] = useState(LANGUAGES[0]);
+  const [code, setCode] = useState(LANGUAGES[0].template);
+  const [results, setResults] = useState<any[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [showHints, setShowHints] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [solvedIds, setSolvedIds] = useState<string[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [time, setTime] = useState(0);
+  const [timerOn, setTimerOn] = useState(true);
+  const [activeTestCase, setActiveTestCase] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fmt = (s: number) =>
@@ -146,7 +146,7 @@ export default function Home() {
     let pool = ALL_QUESTIONS;
     if (diffFilter !== "All") pool = pool.filter(q => q.difficulty === diffFilter);
     if (tagFilter !== "All Tags") pool = pool.filter(q => q.topics.includes(tagFilter));
-    
+
     if (!pool.length) return;
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
     const pick = shuffled.slice(0, 3);
@@ -157,11 +157,11 @@ export default function Home() {
 
   const parseTestCases = (desc: string) => {
     const cases: { input: string, output: string, explanation?: string }[] = [];
-    
+
     // More robust regex to handle variations in HTML and whitespace
     // Matches Example blocks with Input, Output and optional Explanation
     const exampleRegex = /(?:Example|Example\s+\d+):?[\s\S]*?<pre>[\s\S]*?Input:?<\/strong>\s*([\s\S]*?)\s*<strong>Output:?<\/strong>\s*([\s\S]*?)(?:\s*<strong>Explanation:?<\/strong>\s*([\s\S]*?))?\s*<\/pre>/gi;
-    
+
     // Fallback if the above doesn't work (some descriptions use different formatting)
     let match;
     const cleanHTML = (html: string) => html.replace(/<[^>]*>?/gm, '').trim();
@@ -193,7 +193,7 @@ export default function Home() {
 
   const runCode = async () => {
     setIsRunning(true); setConsoleOpen(true); setConsoleTab("result"); setResults([]);
-    
+
     try {
       const response = await fetch("https://emkc.org/api/v2/piston/execute", {
         method: "POST",
@@ -207,20 +207,20 @@ export default function Home() {
 
       const data = await response.json();
       const output = data.run.stdout || data.run.stderr || data.run.output;
-      
+
       // For randomizer, we compare the entire output with expected if possible,
       // but since the user writes their own main, we show the real output.
       const newResults = testCases.length > 0 ? testCases.map((tc, idx) => {
         // In a real 'Solution' environment we would parse the output,
         // but here we show the raw execution results.
         const passed = output.trim() === tc.output.trim();
-        
+
         return {
           status: data.run.code === 0 ? (passed ? "Accepted" : "Wrong Answer") : "Runtime Error",
           actual: output || "(no output)",
           expected: tc.output,
           passed: data.run.code === 0 && (idx === 0 ? true : passed), // idx 0 is often the one they test
-          runtime: "Real Time", 
+          runtime: "Real Time",
           memory: "Real Memory",
           raw: data.run.output
         };
@@ -268,7 +268,7 @@ export default function Home() {
               <input autoFocus value={searchQ} onChange={e => setSearchQ(e.target.value)}
                 placeholder="Search by title or ID…"
                 className="bg-transparent outline-none text-[16px] font-bold w-full placeholder:opacity-20" />
-              <button onClick={() => setListOpen(false)} className="p-2 hover:bg-card rounded-xl transition-colors shrink-0"><X size={18}/></button>
+              <button onClick={() => setListOpen(false)} className="p-2 hover:bg-card rounded-xl transition-colors shrink-0"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {filtered.map(q => (
@@ -278,11 +278,11 @@ export default function Home() {
                   <div className="flex items-center gap-4 min-w-0">
                     <span className="text-[12px] font-black opacity-20 w-10 shrink-0">{q.frontendQuestionId}</span>
                     <span className="font-bold text-[14px] truncate group-hover:translate-x-1 transition-transform">{q.title}</span>
-                    {q.paidOnly && <Lock size={12} className="text-amber-500 shrink-0"/>}
+                    {q.paidOnly && <Lock size={12} className="text-amber-500 shrink-0" />}
                   </div>
                   <div className="flex items-center gap-4 shrink-0 ml-4">
                     <span className={diffClass(String(q.difficulty))}>{String(q.difficulty).toUpperCase()}</span>
-                    {solvedIds.includes(String(q.frontendQuestionId)) && <CheckCircle size={14} className="text-green-500"/>}
+                    {solvedIds.includes(String(q.frontendQuestionId)) && <CheckCircle size={14} className="text-green-500" />}
                   </div>
                 </div>
               ))}
@@ -294,15 +294,15 @@ export default function Home() {
       {/* ── Navbar ── */}
       <header className="h-12 border-b border-border bg-panel flex items-center justify-between px-6 shrink-0 z-50">
         <div className="flex items-center gap-10">
-          <div className="text-[17px] font-bold tracking-tighter cursor-pointer" onClick={randomize}>
-            randomizer<span className="opacity-30">.</span>
+          <div className="text-[17px] font-black tracking-tighter cursor-pointer" onClick={randomize}>
+            algoshuffle<span className="opacity-30">.</span>
           </div>
           <nav className="hidden lg:flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.2em] text-secondary">
             <span onClick={() => setListOpen(true)} className="hover:text-foreground cursor-pointer flex items-center gap-2 transition-colors">
-              <List size={14}/> Questions
+              <List size={14} /> Questions
             </span>
             <span className="flex items-center gap-2">
-              <Flame size={14} fill="currentColor" className="text-orange-500"/> {solvedIds.length} Solved
+              <Flame size={14} fill="currentColor" className="text-orange-500" /> {solvedIds.length} Solved
             </span>
           </nav>
         </div>
@@ -356,13 +356,13 @@ export default function Home() {
                     <span className={diffClass(String(selected.difficulty))}>{String(selected.difficulty).toUpperCase()}</span>
                     {selected.paidOnly && (
                       <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-md">
-                        <Lock size={10}/> Premium
+                        <Lock size={10} /> Premium
                       </span>
                     )}
-                    <span className="flex items-center gap-1 tag-id"><BarChart2 size={12}/> {selected.acceptance_rate.toFixed(1)}%</span>
+                    <span className="flex items-center gap-1 tag-id"><BarChart2 size={12} /> {selected.acceptance_rate.toFixed(1)}%</span>
                     <button onClick={toggleSolved}
                       className={`text-[10px] font-bold px-3 py-1 rounded-md border border-border transition-colors ${solvedIds.includes(String(selected.frontendQuestionId)) ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'text-secondary hover:text-foreground'}`}>
-                      <CheckCircle size={12} className="inline mr-1"/>
+                      <CheckCircle size={12} className="inline mr-1" />
                       {solvedIds.includes(String(selected.frontendQuestionId)) ? 'Solved' : 'Mark Solved'}
                     </button>
                   </div>
@@ -372,9 +372,9 @@ export default function Home() {
                 {stats.totalAccepted && (
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { label: "Accepted",    val: stats.totalAccepted },
+                      { label: "Accepted", val: stats.totalAccepted },
                       { label: "Submissions", val: stats.totalSubmission },
-                      { label: "Acc. Rate",   val: stats.acRate },
+                      { label: "Acc. Rate", val: stats.acRate },
                     ].map(s => (
                       <div key={s.label} className="bg-card/50 border border-border rounded-xl p-3 text-center">
                         <div className="text-[10px] font-black uppercase tracking-widest opacity-30 mb-1">{s.label}</div>
@@ -393,7 +393,7 @@ export default function Home() {
                   <div className="flex flex-wrap gap-2 pt-2">
                     {selected.topics.map(t => (
                       <span key={t} className="flex items-center gap-1 text-[10px] font-bold bg-card border border-border px-2 py-1 rounded-md text-secondary uppercase tracking-wider">
-                        <Tag size={10}/> {t}
+                        <Tag size={10} /> {t}
                       </span>
                     ))}
                   </div>
@@ -402,10 +402,10 @@ export default function Home() {
                 {/* Likes / Dislikes */}
                 <div className="flex items-center gap-6 py-4 border-y border-border/40">
                   <span className="flex items-center gap-2 text-[13px] font-bold text-secondary">
-                    <ThumbsUp size={15} className="text-green-500/60"/> {selected.likes.toLocaleString()}
+                    <ThumbsUp size={15} className="text-green-500/60" /> {selected.likes.toLocaleString()}
                   </span>
                   <span className="flex items-center gap-2 text-[13px] font-bold text-secondary">
-                    <ThumbsDown size={15} className="text-red-500/60"/> {selected.dislikes.toLocaleString()}
+                    <ThumbsDown size={15} className="text-red-500/60" /> {selected.dislikes.toLocaleString()}
                   </span>
                 </div>
 
@@ -414,14 +414,14 @@ export default function Home() {
                   <div className="space-y-3">
                     <button onClick={() => setShowHints(!showHints)}
                       className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest hover:opacity-70 transition-opacity">
-                      <Lightbulb size={15} className="text-amber-400"/>
+                      <Lightbulb size={15} className="text-amber-400" />
                       {showHints ? "Hide Hints" : `Show Hints (${selected.hints.length})`}
                     </button>
                     {showHints && (
                       <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
-                        {selected.hints.map((h,i) => (
+                        {selected.hints.map((h, i) => (
                           <div key={i} className="bg-card/50 border border-border rounded-xl p-4 text-[13px] leading-relaxed opacity-75 italic">
-                            <span className="font-black not-italic text-foreground/40 mr-2">#{i+1}</span>{h}
+                            <span className="font-black not-italic text-foreground/40 mr-2">#{i + 1}</span>{h}
                           </div>
                         ))}
                       </div>
@@ -433,12 +433,12 @@ export default function Home() {
                 <div className="pt-4 border-t border-border space-y-3">
                   <a href={selected.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-[12px] font-bold hover:underline opacity-70 hover:opacity-100 transition-opacity">
-                    <ExternalLink size={13}/> Open on LeetCode
+                    <ExternalLink size={13} /> Open on LeetCode
                   </a>
                   {selected.solution_url && (
                     <a href={selected.solution_url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 text-[12px] font-bold hover:underline opacity-70 hover:opacity-100 transition-opacity">
-                      <ExternalLink size={13}/> Community Solutions
+                      <ExternalLink size={13} /> Community Solutions
                     </a>
                   )}
                 </div>
@@ -455,7 +455,7 @@ export default function Home() {
                           <p className="text-[13px] font-bold opacity-40 group-hover:opacity-100 transition-opacity truncate">{q.title}</p>
                           <p className="text-[10px] opacity-20">{String(q.difficulty).toUpperCase()} · {q.acceptance_rate.toFixed(1)}%</p>
                         </div>
-                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-40 transition-all shrink-0"/>
+                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-40 transition-all shrink-0" />
                       </div>
                     ))}
                   </div>
@@ -489,23 +489,23 @@ export default function Home() {
               </select>
               <div onClick={() => setTimerOn(!timerOn)}
                 className={`flex items-center gap-2 text-[11px] font-mono font-bold cursor-pointer select-none ${timerOn ? 'text-foreground' : 'opacity-20'}`}>
-                <Timer size={14}/> {fmt(time)}
+                <Timer size={14} /> {fmt(time)}
               </div>
             </div>
             <div className="flex items-center gap-4 text-secondary">
-              <button onClick={() => setCode(lang.template)} className="hover:text-foreground transition-colors"><RotateCcw size={14}/></button>
-              <button className="hover:text-foreground"><Settings size={16}/></button>
+              <button onClick={() => setCode(lang.template)} className="hover:text-foreground transition-colors"><RotateCcw size={14} /></button>
+              <button className="hover:text-foreground"><Settings size={16} /></button>
             </div>
           </div>
 
           {/* Code Area */}
           <div className="flex-1 flex overflow-hidden">
             <div className="w-12 bg-card/10 border-r border-border flex flex-col items-center py-6 font-mono text-[11px] opacity-10 select-none">
-              {[...Array(50)].map((_,i) => <span key={i} className="leading-6">{i+1}</span>)}
+              {[...Array(50)].map((_, i) => <span key={i} className="leading-6">{i + 1}</span>)}
             </div>
             <textarea value={code} onChange={e => setCode(e.target.value)}
               className="flex-1 bg-transparent text-foreground font-mono text-[14px] p-6 outline-none resize-none leading-6"
-              spellCheck={false}/>
+              spellCheck={false} />
           </div>
 
           {/* Console */}
@@ -517,7 +517,7 @@ export default function Home() {
                   {t}
                 </button>
               ))}
-              <button onClick={() => setConsoleOpen(false)} className="ml-auto text-secondary hover:text-foreground p-1"><ChevronDown size={14}/></button>
+              <button onClick={() => setConsoleOpen(false)} className="ml-auto text-secondary hover:text-foreground p-1"><ChevronDown size={14} /></button>
             </div>
             <div className="p-6 h-[calc(100%-40px)] overflow-y-auto custom-scrollbar bg-card/5">
               {consoleTab === "testcase" && (
@@ -551,7 +551,7 @@ export default function Home() {
               {consoleTab === "result" && (
                 isRunning ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <RefreshCcw size={24} className="animate-spin text-foreground/20"/>
+                    <RefreshCcw size={24} className="animate-spin text-foreground/20" />
                     <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Running Test Cases...</span>
                   </div>
                 ) : results.length > 0 ? (
@@ -564,7 +564,7 @@ export default function Home() {
                         {results.filter(r => r.passed).length} / {results.length} cases passed
                       </div>
                     </div>
-                    
+
                     <div className="flex gap-2 mb-4">
                       {results.map((r, idx) => (
                         <button key={idx} onClick={() => setActiveTestCase(idx)}
@@ -578,9 +578,9 @@ export default function Home() {
                     {results[activeTestCase] && (
                       <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {results[activeTestCase].status === "Runtime Error" ? (
-                           <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 font-mono text-[13px]">
-                             {results[activeTestCase].message}
-                           </div>
+                          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 font-mono text-[13px]">
+                            {results[activeTestCase].message}
+                          </div>
                         ) : (
                           <>
                             <div>
@@ -630,7 +630,7 @@ export default function Home() {
           <div className="h-12 bg-panel border-t border-border flex items-center justify-between px-4 shrink-0">
             <button onClick={() => setConsoleOpen(!consoleOpen)}
               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-secondary hover:text-foreground px-4 py-1.5 transition-colors">
-              Console {consoleOpen ? <ChevronDown size={14}/> : <ChevronUp size={14}/>}
+              Console {consoleOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
             </button>
             <div className="flex items-center gap-3 pr-2">
               <button onClick={runCode} disabled={isRunning}
@@ -638,7 +638,7 @@ export default function Home() {
                 {isRunning ? 'Running…' : 'Run'}
               </button>
               <button className="px-5 py-2 rounded-lg bg-foreground text-background font-black text-[10px] uppercase tracking-widest hover:opacity-90 flex items-center gap-2 active:scale-95 transition-all">
-                Submit <Send size={14}/>
+                Submit <Send size={14} />
               </button>
             </div>
           </div>

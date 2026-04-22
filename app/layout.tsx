@@ -9,8 +9,16 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "LeetCode Randomizer | Master Your Interviews",
-  description: "Generate random LeetCode problems filtered by difficulty. The ultimate tool for technical interview preparation.",
+  title: "AlgoShuffle | C++ Algorithm Randomizer",
+  description: "Master your coding interviews with AlgoShuffle. A high-performance, real-time C++ coding environment.",
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/favicon.png" },
+    ],
+  },
 };
 
 export default function RootLayout({
