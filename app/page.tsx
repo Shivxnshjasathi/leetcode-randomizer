@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Shuffle, List, Flame, Sun, Moon, Search, X, CheckCircle, 
