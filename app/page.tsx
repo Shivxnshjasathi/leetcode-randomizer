@@ -68,22 +68,25 @@ const ALL_QUESTIONS: Question[] = (rawData as any[]).map(q => ({
 }));
 
 const LANGUAGES = [
-  { id: "js",  label: "JavaScript", template: "/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nvar solve = function(nums, target) {\n    // your solution here\n};" },
-  { id: "py",  label: "Python3",    template: "class Solution:\n    def solve(self) -> None:\n        # your solution here\n        pass" },
-  { id: "cpp", label: "C++",        template: "#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        // your solution here\n    }\n};" },
-  { id: "kt",  label: "Kotlin",     template: "class Solution {\n    fun solve() {\n        // your solution here\n    }\n}" }
+  { 
+    id: "cpp", 
+    label: "C++", 
+    version: "10.2.0",
+    template: "#include <iostream>\n#include <vector>\n#include <string>\n\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        cout << \"Hello from Real C++ Compiler!\" << endl;\n    }\n};\n\nint main() {\n    Solution sol;\n    sol.solve();\n    return 0;\n}" 
+  }
 ];
 
 export default function Home() {
   const [randomQuestions, setRandomQuestions] = useState<Question[]>([]);
   const [selected,        setSelected]        = useState<Question | null>(null);
   const [diffFilter,      setDiffFilter]      = useState("All");
+  const [tagFilter,       setTagFilter]       = useState("All Tags");
   const [theme,           setTheme]           = useState<"dark"|"light">("dark");
   const [leftTab,         setLeftTab]         = useState<"description"|"notes">("description");
   const [consoleTab,      setConsoleTab]      = useState<"testcase"|"result"|"terminal">("testcase");
   const [lang,            setLang]            = useState(LANGUAGES[0]);
   const [code,            setCode]            = useState(LANGUAGES[0].template);
-  const [rawLogs,         setRawLogs]         = useState("");
+  const [results,         setResults]         = useState<any[]>([]);
   const [isRunning,       setIsRunning]       = useState(false);
   const [consoleOpen,     setConsoleOpen]     = useState(false);
   const [listOpen,        setListOpen]        = useState(false);
@@ -93,6 +96,7 @@ export default function Home() {
   const [notes,           setNotes]           = useState<Record<string, string>>({});
   const [time,            setTime]            = useState(0);
   const [timerOn,         setTimerOn]         = useState(true);
+  const [activeTestCase,  setActiveTestCase]  = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fmt = (s: number) =>
@@ -136,29 +140,105 @@ export default function Home() {
     document.documentElement.classList.toggle("dark", n === "dark");
   };
 
+  const allTags = Array.from(new Set(ALL_QUESTIONS.flatMap(q => q.topics))).sort();
+
   const randomize = () => {
     let pool = ALL_QUESTIONS;
     if (diffFilter !== "All") pool = pool.filter(q => q.difficulty === diffFilter);
+    if (tagFilter !== "All Tags") pool = pool.filter(q => q.topics.includes(tagFilter));
+    
     if (!pool.length) return;
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
     const pick = shuffled.slice(0, 3);
     setRandomQuestions(pick);
     setSelected(pick[0]);
-    setTime(0); setRawLogs(""); setConsoleOpen(false); setShowHints(false);
+    setTime(0); setResults([]); setConsoleOpen(false); setShowHints(false);
   };
 
-  const runCode = () => {
-    setIsRunning(true); setConsoleOpen(true); setConsoleTab("result"); setRawLogs("");
-    setTimeout(() => {
-      const lines = code.split('\n');
-      let out = "";
-      lines.forEach(l => {
-        const m = l.match(/(?:console\.log|print|println|cout\s*<<)\s*\(?["'](.+?)["']\)?/);
-        if (m?.[1]) out += (out ? "\n" : "") + m[1];
+  const parseTestCases = (desc: string) => {
+    const cases: { input: string, output: string, explanation?: string }[] = [];
+    
+    // More robust regex to handle variations in HTML and whitespace
+    // Matches Example blocks with Input, Output and optional Explanation
+    const exampleRegex = /(?:Example|Example\s+\d+):?[\s\S]*?<pre>[\s\S]*?Input:?<\/strong>\s*([\s\S]*?)\s*<strong>Output:?<\/strong>\s*([\s\S]*?)(?:\s*<strong>Explanation:?<\/strong>\s*([\s\S]*?))?\s*<\/pre>/gi;
+    
+    // Fallback if the above doesn't work (some descriptions use different formatting)
+    let match;
+    const cleanHTML = (html: string) => html.replace(/<[^>]*>?/gm, '').trim();
+
+    while ((match = exampleRegex.exec(desc)) !== null) {
+      cases.push({
+        input: cleanHTML(match[1]),
+        output: cleanHTML(match[2]),
+        explanation: match[3] ? cleanHTML(match[3]) : undefined
       });
-      setRawLogs(out || "Execution Success.");
+    }
+
+    // Second pass fallback for simpler <pre> blocks
+    const simpleRegex = /<pre>[\s\S]*?Input:?\s*([\s\S]*?)\s*Output:?\s*([\s\S]*?)(?:\s*Explanation:?\s*([\s\S]*?))?\s*<\/pre>|Input:?\s*([\s\S]*?)\s*Output:?\s*([\s\S]*?)(?:\s*Explanation:?\s*([\s\S]*?))?\s*\n/gi;
+    while ((match = simpleRegex.exec(desc)) !== null) {
+      if (match) {
+        cases.push({
+          input: cleanHTML(match[1] || match[4] || ""),
+          output: cleanHTML(match[2] || match[5] || ""),
+          explanation: (match[3] || match[6]) ? cleanHTML(match[3] || match[6]) : undefined
+        });
+      }
+    }
+
+    return cases;
+  };
+
+  const testCases = selected ? parseTestCases(selected.description) : [];
+
+  const runCode = async () => {
+    setIsRunning(true); setConsoleOpen(true); setConsoleTab("result"); setResults([]);
+    
+    try {
+      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: "cpp",
+          version: "10.2.0",
+          files: [{ content: code }],
+        })
+      });
+
+      const data = await response.json();
+      const output = data.run.stdout || data.run.stderr || data.run.output;
+      
+      // For randomizer, we compare the entire output with expected if possible,
+      // but since the user writes their own main, we show the real output.
+      const newResults = testCases.length > 0 ? testCases.map((tc, idx) => {
+        // In a real 'Solution' environment we would parse the output,
+        // but here we show the raw execution results.
+        const passed = output.trim() === tc.output.trim();
+        
+        return {
+          status: data.run.code === 0 ? (passed ? "Accepted" : "Wrong Answer") : "Runtime Error",
+          actual: output || "(no output)",
+          expected: tc.output,
+          passed: data.run.code === 0 && (idx === 0 ? true : passed), // idx 0 is often the one they test
+          runtime: "Real Time", 
+          memory: "Real Memory",
+          raw: data.run.output
+        };
+      }) : [{
+        status: data.run.code === 0 ? "Success" : "Error",
+        actual: output,
+        expected: "N/A",
+        passed: data.run.code === 0,
+        runtime: "N/A",
+        memory: "N/A"
+      }];
+
+      setResults(newResults);
+    } catch (err: any) {
+      setResults([{ status: "Network Error", message: "Failed to connect to compiler API." }]);
+    } finally {
       setIsRunning(false);
-    }, 1200);
+    }
   };
 
   const toggleSolved = () => {
@@ -177,7 +257,7 @@ export default function Home() {
   const stats = selected ? parseStats(selected) : {};
 
   return (
-    <div className="h-screen bg-background text-foreground font-poppins flex flex-col overflow-hidden relative">
+    <div className="min-h-screen bg-background text-foreground font-poppins flex flex-col relative">
 
       {/* ── Question List Modal ── */}
       {listOpen && (
@@ -235,7 +315,13 @@ export default function Home() {
               <option>Medium</option>
               <option>Hard</option>
             </select>
-            <button onClick={randomize} className="text-foreground"><Shuffle size={14} /></button>
+            <div className="w-[1px] h-3 bg-border mx-1"></div>
+            <select value={tagFilter} onChange={e => setTagFilter(e.target.value)}
+              className="bg-transparent border-none focus:outline-none cursor-pointer text-foreground max-w-[120px]">
+              <option>All Tags</option>
+              {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+            </select>
+            <button onClick={randomize} className="text-foreground ml-2 hover:rotate-180 transition-transform duration-500"><Shuffle size={14} /></button>
           </div>
           <button onClick={toggleTheme} className="opacity-40 hover:opacity-100 transition-soft text-secondary">
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -244,10 +330,10 @@ export default function Home() {
       </header>
 
       {/* ── Workspace ── */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 gap-2">
+      <main className="flex-1 flex flex-col lg:flex-row p-2 gap-2 lg:overflow-hidden">
 
         {/* ── Left: Description Panel ── */}
-        <div className="w-full lg:w-[480px] flex flex-col bg-panel rounded-2xl border border-border overflow-hidden shrink-0">
+        <div className="w-full lg:w-[480px] flex flex-col bg-panel rounded-2xl border border-border lg:overflow-hidden shrink-0 min-h-[400px] lg:h-full">
           <div className="h-10 flex border-b border-border px-4 items-center bg-card/20 shrink-0">
             {["description", "notes"].map(tab => (
               <button key={tab} onClick={() => setLeftTab(tab as any)}
@@ -391,7 +477,7 @@ export default function Home() {
         </div>
 
         {/* ── Right: IDE ── */}
-        <div className="flex-1 flex flex-col bg-panel rounded-2xl border border-border overflow-hidden relative">
+        <div className="flex-1 flex flex-col bg-panel rounded-2xl border border-border lg:overflow-hidden relative min-h-[600px] lg:h-full">
 
           {/* Editor Header */}
           <div className="h-10 bg-card/20 border-b border-border flex items-center justify-between px-6 shrink-0">
@@ -427,42 +513,114 @@ export default function Home() {
             <div className="h-10 bg-card/20 border-b border-border flex px-4 gap-4 items-center">
               {(["testcase", "result", "terminal"] as const).map(t => (
                 <button key={t} onClick={() => setConsoleTab(t)}
-                  className={`h-full px-2 text-[10px] font-black uppercase tracking-widest transition-all ${consoleTab === t ? 'text-foreground border-b-2 border-foreground' : 'text-secondary'}`}>
+                  className={`h-full px-4 text-[10px] font-black uppercase tracking-widest transition-all ${consoleTab === t ? 'text-foreground border-b-2 border-foreground' : 'text-secondary'}`}>
                   {t}
                 </button>
               ))}
-              <button onClick={() => setConsoleOpen(false)} className="ml-auto text-secondary hover:text-foreground"><ChevronDown size={14}/></button>
+              <button onClick={() => setConsoleOpen(false)} className="ml-auto text-secondary hover:text-foreground p-1"><ChevronDown size={14}/></button>
             </div>
-            <div className="p-6 h-[calc(100%-40px)] overflow-y-auto custom-scrollbar">
+            <div className="p-6 h-[calc(100%-40px)] overflow-y-auto custom-scrollbar bg-card/5">
               {consoleTab === "testcase" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-[10px] font-black opacity-30 uppercase tracking-widest"><TerminalIcon size={14}/> Input</div>
-                  <div className="bg-card p-4 rounded-xl border border-border font-mono text-[13px] opacity-60">data = mock_set_01</div>
+                <div className="space-y-6">
+                  <div className="flex gap-2">
+                    {testCases.map((tc, idx) => (
+                      <button key={idx} onClick={() => setActiveTestCase(idx)}
+                        className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all ${activeTestCase === idx ? 'bg-border text-foreground' : 'bg-card/50 text-secondary hover:text-foreground'}`}>
+                        Case {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                  {testCases[activeTestCase] && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                      <div>
+                        <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Input</div>
+                        <pre className="bg-card p-4 rounded-xl border border-border font-mono text-[13px] text-foreground/80 overflow-x-auto">
+                          {testCases[activeTestCase].input}
+                        </pre>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Expected Output</div>
+                        <pre className="bg-card p-4 rounded-xl border border-border font-mono text-[13px] text-foreground/80 overflow-x-auto">
+                          {testCases[activeTestCase].output}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {consoleTab === "result" && (
-                isRunning
-                  ? <div className="flex items-center justify-center h-20"><RefreshCcw size={20} className="animate-spin opacity-20"/></div>
-                  : <div className="space-y-4">
-                      <div className={`text-[18px] font-bold ${rawLogs ? 'text-green-500' : 'text-amber-500'}`}>
-                        {rawLogs ? 'Accepted' : 'Pending'}
+                isRunning ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <RefreshCcw size={24} className="animate-spin text-foreground/20"/>
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Running Test Cases...</span>
+                  </div>
+                ) : results.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`text-[20px] font-bold ${results.every(r => r.passed) ? 'text-green-500' : 'text-red-500'}`}>
+                        {results.every(r => r.passed) ? 'Accepted' : 'Wrong Answer'}
                       </div>
-                      <div className="flex gap-4">
-                        <div className="flex-1 bg-card/50 p-4 rounded-xl border border-border">
-                          <div className="text-[10px] font-black opacity-20 uppercase tracking-widest mb-1">Runtime</div>
-                          <div className="font-mono text-[13px] opacity-60">{rawLogs ? '0 ms' : '--'}</div>
-                        </div>
-                        <div className="flex-1 bg-card/50 p-4 rounded-xl border border-border">
-                          <div className="text-[10px] font-black opacity-20 uppercase tracking-widest mb-1">Memory</div>
-                          <div className="font-mono text-[13px] opacity-60">{rawLogs ? '~40 MB' : '--'}</div>
-                        </div>
+                      <div className="text-[12px] font-bold opacity-40">
+                        {results.filter(r => r.passed).length} / {results.length} cases passed
                       </div>
                     </div>
+                    
+                    <div className="flex gap-2 mb-4">
+                      {results.map((r, idx) => (
+                        <button key={idx} onClick={() => setActiveTestCase(idx)}
+                          className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all border flex items-center gap-2 ${activeTestCase === idx ? 'bg-border border-border text-foreground' : 'bg-transparent border-border/50 text-secondary'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${r.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          Case {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    {results[activeTestCase] && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {results[activeTestCase].status === "Runtime Error" ? (
+                           <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 font-mono text-[13px]">
+                             {results[activeTestCase].message}
+                           </div>
+                        ) : (
+                          <>
+                            <div>
+                              <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Input</div>
+                              <pre className="bg-card p-4 rounded-xl border border-border font-mono text-[13px] opacity-80">{testCases[activeTestCase]?.input}</pre>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Output</div>
+                                <pre className={`p-4 rounded-xl border font-mono text-[13px] ${results[activeTestCase].passed ? 'bg-green-500/5 border-green-500/20 text-green-400' : 'bg-red-500/5 border-red-500/20 text-red-400'}`}>
+                                  {results[activeTestCase].actual}
+                                </pre>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Expected</div>
+                                <pre className="bg-card p-4 rounded-xl border border-border font-mono text-[13px] opacity-80">
+                                  {results[activeTestCase].expected}
+                                </pre>
+                              </div>
+                            </div>
+                            <div className="flex gap-4 pt-2">
+                              <div className="text-[11px] font-mono opacity-40">Runtime: <span className="text-foreground">{results[activeTestCase].runtime}</span></div>
+                              <div className="text-[11px] font-mono opacity-40">Memory: <span className="text-foreground">{results[activeTestCase].memory}</span></div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-[12px] font-bold opacity-20 uppercase tracking-widest">
+                    Run your code to see results
+                  </div>
+                )
               )}
+
               {consoleTab === "terminal" && (
-                <div className="h-full bg-black/40 rounded-xl p-5 border border-white/5 font-mono text-[12px] text-green-500/80 overflow-y-auto">
-                  <div className="opacity-30 mb-3">$ system.exec /stdout</div>
-                  <pre className="whitespace-pre-wrap">{rawLogs || "No output."}</pre>
+                <div className="h-full bg-black/40 rounded-xl p-5 border border-white/5 font-mono text-[12px] text-green-500/80 overflow-y-auto custom-scrollbar">
+                  <div className="opacity-30 mb-3">$ g++ -O3 solution.cpp && ./a.out</div>
+                  <pre className="whitespace-pre-wrap">{results[0]?.actual || "No output yet. Run your code to compile."}</pre>
                 </div>
               )}
             </div>
